@@ -1,14 +1,18 @@
-FROM node:14 AS web-build
+FROM node:14-alpine AS web-build
+
 WORKDIR /usr/src/app
-COPY ./ ./client
-RUN cd client && npm install && npm run build --prod
 
-# Use official nginx image as the base image
-FROM nginx:latest
+# Install dependencies first to improve build cache reuse.
+COPY package*.json ./
+RUN npm install
 
-# Copy the build output to replace the default nginx contents.
-COPY --from=web-build /usr/src/app/client/dist/client/ /usr/share/nginx/html
+COPY . .
+RUN npm run build --prod
+
+FROM nginx:1.27-alpine
+
+COPY --from=web-build /usr/src/app/dist/client/ /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port 4200
 EXPOSE 4200
+CMD ["nginx", "-g", "daemon off;"]
